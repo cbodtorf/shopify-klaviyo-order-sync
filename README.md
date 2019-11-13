@@ -14,7 +14,7 @@ Node.js and Typescript
     - Iterating over each order I would queue a **"Placed Order"** Event and diving into each order's line item I would also push an **"Ordered Product"** Event.
         - ie. an order has two line items, then 3 events would be queued.
 
-#### Installattion
+#### Installation
 ###### Prerequisites:
 * **Node** I used: `v10.15.3`
 
