@@ -1,5 +1,5 @@
 {
-  "name": "klaviyo-assessment",
+  "name": "shopify-klaviyo-order-sync",
   "version": "1.0.0",
   "description": "The script will consist of doing a 2016 “historical sync” of Shopfy data into Klaviyo.",
   "scripts": {
