@@ -1,10 +1,10 @@
-import { IEventSchema, IOrder, ILineItem } from './contracts'
+import { IEventSchema, IEventOrder, IEventLineItem } from './contracts'
 
 export class Event implements IEventSchema {
   token: string;
   event: string;
   customer_properties: object;
-  properties: IOrder | ILineItem;
+  properties: IEventOrder | IEventLineItem;
   time: number = 0;
 
   constructor(private args: IEventSchema) {

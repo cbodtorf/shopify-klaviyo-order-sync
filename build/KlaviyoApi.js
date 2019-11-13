@@ -55,10 +55,11 @@ var KlaviyoApi = /** @class */ (function () {
     };
     KlaviyoApi.prototype.createEventsFromOrder = function (order) {
         var _this = this;
-        // Set Klaviyo Specific Props for Order
-        order.$event_id = "" + order.id;
-        order.$value = order.total_price;
         // Explicitly annotate type when instantiating blank value;
+        // Order Props that depend on Line Item Iteration:
+        var itemNames = [];
+        var brands = [];
+        var eventItems = [];
         var events = [];
         var time = this.unix(new Date(order.processed_at));
         var customerProperties = {
@@ -77,29 +78,53 @@ var KlaviyoApi = /** @class */ (function () {
             customerProperties.$country = order.shipping_address.country;
         }
         ;
+        // Iterate through line items and push 'Ordered Product' events to queue
+        order.line_items.forEach(function (item) {
+            // Set Klaviyo Specific Props for Item
+            var eventItem = {
+                $event_id: order.id + "_" + item.variant_id,
+                $value: item.price,
+                ProductName: item.name,
+                ProductID: item.product_id,
+                Quantity: item.quantity,
+                SKU: item.sku,
+                "Variant Name": item.variant_title,
+                Brand: item.vendor,
+                ItemPrice: item.price,
+                RowTotal: item.price,
+            };
+            // push order level properties/
+            itemNames.push(item.name);
+            brands.push(item.vendor);
+            eventItems.push(eventItem);
+            var orderedProductEvent = new Event_1.Event({
+                token: _this.publicApiKey,
+                event: 'Ordered Product',
+                customer_properties: customerProperties,
+                properties: eventItem,
+                time: time,
+            });
+            events.push(orderedProductEvent);
+        });
         // Push 'Placed Order' event to queue
         var placeOrderEvent = new Event_1.Event({
             token: this.publicApiKey,
             event: 'Placed Order',
             customer_properties: customerProperties,
-            properties: order,
+            properties: {
+                $event_id: "" + order.id,
+                $value: order.total_price,
+                ItemNames: itemNames,
+                Brands: brands,
+                "Discount Code": order.discount_codes[0],
+                "Discount Value": order.total_discounts,
+                shipping_address: order.shipping_address,
+                billing_address: order.billing_address,
+                Items: eventItems
+            },
             time: time,
         });
         events.push(placeOrderEvent);
-        // Iterate through line items and push 'Ordered Product' events to queue
-        order.line_items.forEach(function (item) {
-            // Set Klaviyo Specific Props for Item
-            item.$event_id = order.id + "_" + item.name;
-            item.$value = item.price;
-            var orderedProductEvent = new Event_1.Event({
-                token: _this.publicApiKey,
-                event: 'Ordered Product',
-                customer_properties: customerProperties,
-                properties: item,
-                time: time,
-            });
-            events.push(orderedProductEvent);
-        });
         return events;
     };
     KlaviyoApi.prototype.track = function (event) {

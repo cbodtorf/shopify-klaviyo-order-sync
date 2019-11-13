@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { Event } from './Event'
-import { I$CustomerProperties, IOrder, ILineItem, RequestInterface } from './contracts'
+import { I$CustomerProperties, IOrder, IOrderLineItem, RequestInterface, IEventLineItem } from './contracts'
 
 export class KlaviyoApi {
   urlBase: string = 'https://a.klaviyo.com/api/track';
@@ -17,11 +17,12 @@ export class KlaviyoApi {
   }
 
   public createEventsFromOrder(order: IOrder): Event[] {
-    // Set Klaviyo Specific Props for Order
-    order.$event_id = `${order.id}`;
-    order.$value = order.total_price;
-
     // Explicitly annotate type when instantiating blank value;
+    // Order Props that depend on Line Item Iteration:
+    const itemNames: string[] = [];
+    const brands: string[] = [];
+    const eventItems: IEventLineItem[] = [];
+
     const events: Event[] = [];
     const time = this.unix(new Date(order.processed_at));
 
@@ -42,34 +43,58 @@ export class KlaviyoApi {
       customerProperties.$country = order.shipping_address.country
     };
 
+    // Iterate through line items and push 'Ordered Product' events to queue
+    order.line_items.forEach((item: IOrderLineItem): void => {
+      // Set Klaviyo Specific Props for Item
+      const eventItem: IEventLineItem = {
+        $event_id: `${order.id}_${item.variant_id}`,
+        $value: item.price,
+        ProductName: item.name,
+        ProductID: item.product_id,
+        Quantity: item.quantity,
+        SKU: item.sku,
+        "Variant Name": item.variant_title,
+        Brand: item.vendor,
+        ItemPrice: item.price,
+        RowTotal: item.price,
+      }
+
+      // push order level properties/
+      itemNames.push(item.name);
+      brands.push(item.vendor);
+      eventItems.push(eventItem);
+
+      const orderedProductEvent = new Event({
+        token: this.publicApiKey,
+        event: 'Ordered Product',
+        customer_properties: customerProperties,
+        properties: eventItem,
+        time: time,
+      });
+
+      events.push(orderedProductEvent);
+    });
 
     // Push 'Placed Order' event to queue
     const placeOrderEvent = new Event({
       token: this.publicApiKey,
       event: 'Placed Order',
       customer_properties: customerProperties,
-      properties: order,
+      properties: {
+        $event_id: `${order.id}`,
+        $value: order.total_price,
+        ItemNames: itemNames,
+        Brands: brands,
+        "Discount Code": order.discount_codes[0],
+        "Discount Value": order.total_discounts,
+        shipping_address: order.shipping_address,
+        billing_address: order.billing_address,
+        Items: eventItems
+      },
       time: time,
     });
 
     events.push(placeOrderEvent);
-
-    // Iterate through line items and push 'Ordered Product' events to queue
-    order.line_items.forEach((item: ILineItem): void => {
-      // Set Klaviyo Specific Props for Item
-      item.$event_id = `${order.id}_${item.name}`;
-      item.$value = item.price;
-
-      const orderedProductEvent = new Event({
-        token: this.publicApiKey,
-        event: 'Ordered Product',
-        customer_properties: customerProperties,
-        properties: item,
-        time: time,
-      });
-
-      events.push(orderedProductEvent);
-    });
 
     return events;
   }
@@ -77,6 +102,7 @@ export class KlaviyoApi {
   public async track(event: Event): Promise<void>{
     // Convert payload to string before converting to Base64
     const jsonString = JSON.stringify(event);
+    // console.log('track event:', event.event, ' => ', 'e:', event);
     const data = Buffer.from(jsonString).toString('base64');
 
     await this.klaviyoAxios.get<RequestInterface>(this.urlBase, {
