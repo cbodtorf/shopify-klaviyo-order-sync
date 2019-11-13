@@ -19,8 +19,8 @@ Node.js and Typescript
 * **Node** I used: `v10.15.3`
 
 ##### Setup:
-* `git clone`
-* `cd repo`
+* `git clone git@github.com:cbodtorf/shopify-klaviyo-order-sync.git`
+* `cd shopify-klaviyo-order-sync`
 * `npm install`
 
 ###### Env:
